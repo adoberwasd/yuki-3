@@ -1,17 +1,33 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-type TabId = "catalog" | "orders" | "profile";
-type PlanId = "lite" | "private" | "ultimate";
-type CategoryId = "soft" | "standoff2" | "cs2" | "valorant" | "brawlstars";
+type TabId = "catalog" | "orders" | "balance" | "profile";
 type DurationId = "trial" | "month" | "lifetime";
+type CategoryId = "all" | "standoff2" | "cs2" | "valorant" | "brawlstars" | "ios";
+
+type Tariff = {
+  id: DurationId;
+  title: string;
+  subtitle: string;
+  price: number;
+};
+
+type Product = {
+  id: string;
+  category: Exclude<CategoryId, "all">;
+  title: string;
+  short: string;
+  description: string;
+  image: string; // ← сюда вставляй ссылку на фото
+  features: string[];
+  tariffs: Tariff[];
+};
 
 type CartItem = {
   id: number;
+  productId: string;
   title: string;
   category: string;
-  plan: string;
-  duration: string;
-  quantity: number;
+  tariffTitle: string;
   total: number;
 };
 
@@ -31,6 +47,7 @@ declare global {
         setBackgroundColor?: (color: string) => void;
         HapticFeedback?: {
           impactOccurred: (style: "light" | "medium" | "heavy") => void;
+          notificationOccurred?: (type: "success" | "warning" | "error") => void;
         };
         initDataUnsafe?: {
           user?: TelegramUser;
@@ -43,109 +60,150 @@ declare global {
 const money = new Intl.NumberFormat("ru-RU");
 const formatPrice = (value: number) => `${money.format(value)} ₽`;
 
-const plans = [
+const categories: {
+  id: CategoryId;
+  title: string;
+  short: string;
+  icon: string;
+}[] = [
+  { id: "all", title: "YUKI Soft", short: "Весь софт", icon: "✦" },
+  { id: "standoff2", title: "Standoff 2", short: "Игровой софт", icon: "🎯" },
+  { id: "cs2", title: "CS2", short: "Игровой софт", icon: "⚡" },
+  { id: "valorant", title: "Valorant", short: "Игровой софт", icon: "💎" },
+  { id: "brawlstars", title: "Brawl Stars", short: "Мобильный софт", icon: "🌟" },
+  { id: "ios", title: "Сертификаты iOS", short: "Подписи приложений", icon: "" },
+];
+
+// ────────────────────────────────────────────────────────────────────────────
+// 📦 КАТАЛОГ ТОВАРОВ
+// Чтобы вставить фото товара — пропиши ссылку в поле image: "https://..."
+// ────────────────────────────────────────────────────────────────────────────
+const products: Product[] = [
   {
-    id: "lite" as const,
-    title: "Lite",
-    subtitle: "Быстрый старт",
-    multiplier: 1,
-    badge: "Start",
-    gradient: "from-violet-500 via-fuchsia-500 to-purple-500",
-    ring: "ring-violet-300/40",
+    id: "s2-aimbot",
+    category: "standoff2",
+    title: "Standoff 2 | Aimbot PRO",
+    short: "Автоматическое наведение",
+    description:
+      "Топовый Aimbot для Standoff 2 с тонкой настройкой плавности, FOV и приоритета цели. Работает стабильно, не палится в матчах.",
+    image: "", // ← вставь сюда ссылку на фото
+    features: ["Aim Smooth", "Trigger Bot", "Anti-detect", "Обновления"],
+    tariffs: [
+      { id: "trial", title: "7 дней", subtitle: "Тест", price: 150 },
+      { id: "month", title: "30 дней", subtitle: "Стандарт", price: 450 },
+      { id: "lifetime", title: "Навсегда", subtitle: "Один платёж", price: 1500 },
+    ],
   },
   {
-    id: "private" as const,
-    title: "Private",
-    subtitle: "Самый популярный",
-    multiplier: 2.15,
-    badge: "Top",
-    gradient: "from-fuchsia-500 via-violet-500 to-indigo-500",
-    ring: "ring-fuchsia-300/50",
+    id: "s2-esp",
+    category: "standoff2",
+    title: "Standoff 2 | ESP Wallhack",
+    short: "Видеть всех сквозь стены",
+    description:
+      "Полноценный ESP с отображением врагов, оружия, дропа и линий до игроков. Минимальная нагрузка на телефон.",
+    image: "",
+    features: ["Box ESP", "Skeleton", "Distance", "Loot"],
+    tariffs: [
+      { id: "trial", title: "7 дней", subtitle: "Тест", price: 120 },
+      { id: "month", title: "30 дней", subtitle: "Стандарт", price: 380 },
+      { id: "lifetime", title: "Навсегда", subtitle: "Один платёж", price: 1200 },
+    ],
   },
   {
-    id: "ultimate" as const,
-    title: "Ultimate",
-    subtitle: "Максимум возможностей",
-    multiplier: 3.6,
-    badge: "Best",
-    gradient: "from-indigo-500 via-violet-500 to-purple-600",
-    ring: "ring-indigo-300/40",
+    id: "cs2-wh",
+    category: "cs2",
+    title: "CS2 | Wallhack ESP",
+    short: "Показ игроков через стены",
+    description:
+      "Чистый ESP для CS2 без лишних функций — только то, что нужно для уверенной игры на любом ранге.",
+    image: "",
+    features: ["Player ESP", "Bomb info", "Safe mode", "Auto-update"],
+    tariffs: [
+      { id: "trial", title: "7 дней", subtitle: "Тест", price: 250 },
+      { id: "month", title: "30 дней", subtitle: "Стандарт", price: 750 },
+      { id: "lifetime", title: "Навсегда", subtitle: "Один платёж", price: 2500 },
+    ],
+  },
+  {
+    id: "cs2-aim",
+    category: "cs2",
+    title: "CS2 | Aim Assist",
+    short: "Помощь при стрельбе",
+    description:
+      "Аккуратный Aim Assist без палева. Настройка плавности, активация по клавише, поддержка всех режимов.",
+    image: "",
+    features: ["Smooth Aim", "Hotkey", "Settings", "Stable"],
+    tariffs: [
+      { id: "trial", title: "7 дней", subtitle: "Тест", price: 300 },
+      { id: "month", title: "30 дней", subtitle: "Стандарт", price: 900 },
+      { id: "lifetime", title: "Навсегда", subtitle: "Один платёж", price: 3000 },
+    ],
+  },
+  {
+    id: "vlr-cheat",
+    category: "valorant",
+    title: "Valorant | Private Cheat",
+    short: "Премиум приватка",
+    description:
+      "Приватный софт под Valorant с продуманным интерфейсом, поддержкой 24/7 и регулярными апдейтами под патчи.",
+    image: "",
+    features: ["ESP", "Aim", "Private build", "Поддержка"],
+    tariffs: [
+      { id: "trial", title: "7 дней", subtitle: "Тест", price: 400 },
+      { id: "month", title: "30 дней", subtitle: "Стандарт", price: 1200 },
+      { id: "lifetime", title: "Навсегда", subtitle: "Один платёж", price: 4500 },
+    ],
+  },
+  {
+    id: "bs-mod",
+    category: "brawlstars",
+    title: "Brawl Stars | Mod Menu",
+    short: "Мод-меню с возможностями",
+    description:
+      "Кастомное мод-меню для Brawl Stars с расширенными функциями для приватных серверов. Простая установка.",
+    image: "",
+    features: ["Unlock all", "Custom skins", "Private server", "Easy install"],
+    tariffs: [
+      { id: "trial", title: "7 дней", subtitle: "Тест", price: 90 },
+      { id: "month", title: "30 дней", subtitle: "Стандарт", price: 290 },
+      { id: "lifetime", title: "Навсегда", subtitle: "Один платёж", price: 900 },
+    ],
+  },
+  {
+    id: "ios-cert-personal",
+    category: "ios",
+    title: "Сертификат iOS | Personal",
+    short: "Личный сертификат подписи",
+    description:
+      "Персональный сертификат для подписи iOS-приложений. Стабильная работа, быстрая выдача после оплаты.",
+    image: "",
+    features: ["Личный", "Быстрая выдача", "Стабильность", "Поддержка"],
+    tariffs: [
+      { id: "month", title: "30 дней", subtitle: "Базовый", price: 350 },
+      { id: "lifetime", title: "365 дней", subtitle: "Годовой", price: 2500 },
+    ],
+  },
+  {
+    id: "ios-cert-business",
+    category: "ios",
+    title: "Сертификат iOS | Business",
+    short: "Корпоративная подпись",
+    description:
+      "Корпоративный сертификат iOS для масштабного распространения приложений. Подходит для команд и студий.",
+    image: "",
+    features: ["Enterprise", "Без лимитов", "Поддержка 24/7", "Гарантия"],
+    tariffs: [
+      { id: "month", title: "30 дней", subtitle: "Базовый", price: 1500 },
+      { id: "lifetime", title: "365 дней", subtitle: "Годовой", price: 9900 },
+    ],
   },
 ];
 
-const categories = [
-  {
-    id: "soft" as const,
-    title: "YUKI Soft",
-    short: "Основной каталог",
-    code: "SOFT",
-    icon: "✦",
-    basePrice: 149,
-    gradient: "from-violet-500/90 to-fuchsia-500/90",
-    description:
-      "Универсальный раздел с цифровыми товарами YUKI: быстрый доступ, авто-выдача и понятная активация прямо внутри мини-аппа.",
-    features: ["Автовыдача", "Telegram access", "Обновления", "Поддержка"],
-  },
-  {
-    id: "standoff2" as const,
-    title: "Standoff 2",
-    short: "Игровой раздел",
-    code: "S2",
-    icon: "🎯",
-    basePrice: 189,
-    gradient: "from-purple-500/90 to-violet-400/90",
-    description:
-      "Раздел с тематическими игровыми пакетами YUKI для быстрого выбора, оформления и получения доступа без лишних шагов.",
-    features: ["Быстрый выбор", "Актуальные версии", "Инструкция", "1 устройство"],
-  },
-  {
-    id: "cs2" as const,
-    title: "CS2",
-    short: "Популярный раздел",
-    code: "CS2",
-    icon: "⚡",
-    basePrice: 219,
-    gradient: "from-fuchsia-500/90 to-violet-500/90",
-    description:
-      "Темный premium-блок в стиле YUKI с акцентом на лаконичную подачу товара, срок доступа и итоговую цену.",
-    features: ["Premium card", "Чистый UI", "30 дней", "Мгновенно"],
-  },
-  {
-    id: "valorant" as const,
-    title: "Valorant",
-    short: "Отдельный пакет",
-    code: "VLR",
-    icon: "💎",
-    basePrice: 239,
-    gradient: "from-violet-500/90 to-indigo-500/90",
-    description:
-      "Оформление раздела с крупными переключателями, аккуратными стеклянными карточками и фиолетовым свечением, как ты и хотел.",
-    features: ["Glass style", "Фиолетовый glow", "Удобный выбор", "YUKI UI"],
-  },
-  {
-    id: "brawlstars" as const,
-    title: "Brawl Stars",
-    short: "Мобильный блок",
-    code: "BS",
-    icon: "🌟",
-    basePrice: 129,
-    gradient: "from-pink-500/90 to-violet-500/90",
-    description:
-      "Легкий мобильный раздел для Telegram Mini App: крупные кнопки, простая навигация и итоговый заказ в пару тапов.",
-    features: ["Mobile first", "Telegram ready", "Простой checkout", "Нежный blur"],
-  },
-];
-
-const durations = [
-  { id: "trial" as const, title: "7 дней", subtitle: "Тестовый", multiplier: 0.6 },
-  { id: "month" as const, title: "30 дней", subtitle: "Стандарт", multiplier: 1 },
-  { id: "lifetime" as const, title: "Навсегда", subtitle: "Один платеж", multiplier: 3.7 },
-];
-
-const navItems = [
-  { id: "catalog" as const, label: "Каталог", icon: "◈" },
-  { id: "orders" as const, label: "Заказы", icon: "◉" },
-  { id: "profile" as const, label: "Профиль", icon: "◎" },
+const navItems: { id: TabId; label: string; icon: string }[] = [
+  { id: "catalog", label: "Каталог", icon: "◈" },
+  { id: "orders", label: "Заказы", icon: "◉" },
+  { id: "balance", label: "Баланс", icon: "₽" },
+  { id: "profile", label: "Профиль", icon: "◎" },
 ];
 
 function SectionCard({
@@ -157,25 +215,49 @@ function SectionCard({
 }) {
   return (
     <section
-      className={`relative rounded-[30px] border border-white/10 bg-white/[0.045] p-5 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl ${className}`}
+      className={`relative rounded-[28px] border border-white/10 bg-white/[0.045] p-5 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl ${className}`}
     >
       {children}
     </section>
   );
 }
 
+function ProductImage({ src, title }: { src: string; title: string }) {
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={title}
+        className="h-full w-full object-cover"
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).style.display = "none";
+        }}
+      />
+    );
+  }
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-violet-600/40 via-fuchsia-500/30 to-indigo-600/40 text-5xl">
+      ✦
+    </div>
+  );
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("catalog");
-  const [selectedPlan, setSelectedPlan] = useState<PlanId>("private");
-  const [selectedCategory, setSelectedCategory] = useState<CategoryId>("soft");
-  const [selectedDuration, setSelectedDuration] = useState<DurationId>("month");
-  const [quantity, setQuantity] = useState(1);
+  const [selectedCategory, setSelectedCategory] = useState<CategoryId>("all");
+  const [openedProductId, setOpenedProductId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [noFundsModal, setNoFundsModal] = useState<{
+    needed: number;
+    title: string;
+  } | null>(null);
+  const [topUpAmount, setTopUpAmount] = useState("500");
+
   const [balance, setBalance] = useState<number>(() => {
-    if (typeof window === "undefined") return 1200;
+    if (typeof window === "undefined") return 0;
     const saved = window.localStorage.getItem("yuki_balance_rub");
-    const parsed = saved ? Number(saved) : 1200;
-    return Number.isFinite(parsed) ? parsed : 1200;
+    const parsed = saved ? Number(saved) : 0;
+    return Number.isFinite(parsed) ? parsed : 0;
   });
   const [cart, setCart] = useState<CartItem[]>(() => {
     if (typeof window === "undefined") return [];
@@ -222,478 +304,576 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const currentPlan = useMemo(
-    () => plans.find((plan) => plan.id === selectedPlan) ?? plans[0],
-    [selectedPlan],
-  );
-  const currentCategory = useMemo(
-    () => categories.find((category) => category.id === selectedCategory) ?? categories[0],
-    [selectedCategory],
-  );
-  const currentDuration = useMemo(
-    () => durations.find((duration) => duration.id === selectedDuration) ?? durations[1],
-    [selectedDuration],
-  );
-
-  const unitPrice = Math.round(
-    currentCategory.basePrice * currentPlan.multiplier * currentDuration.multiplier,
-  );
-  const totalPrice = unitPrice * quantity;
-  const totalOrdersPrice = cart.reduce((sum, item) => sum + item.total, 0);
-  const avatarLetter = (user.first_name || "Y").trim().charAt(0).toUpperCase();
-
   const vibrate = (style: "light" | "medium" | "heavy") => {
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred(style);
   };
 
-  const handlePurchase = () => {
-    if (balance < totalPrice) {
+  const visibleProducts = useMemo(() => {
+    if (selectedCategory === "all") return products;
+    return products.filter((p) => p.category === selectedCategory);
+  }, [selectedCategory]);
+
+  const openedProduct = useMemo(
+    () => products.find((p) => p.id === openedProductId) ?? null,
+    [openedProductId],
+  );
+
+  const totalOrdersPrice = cart.reduce((sum, item) => sum + item.total, 0);
+  const avatarLetter = (user.first_name || "Y").trim().charAt(0).toUpperCase();
+
+  const handleBuyTariff = (product: Product, tariff: Tariff) => {
+    if (balance < tariff.price) {
       vibrate("heavy");
-      setActiveTab("profile");
-      setNotice(`Недостаточно средств. Нужно ещё ${formatPrice(totalPrice - balance)}.`);
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("error");
+      setNoFundsModal({
+        needed: tariff.price - balance,
+        title: `${product.title} • ${tariff.title}`,
+      });
       return;
     }
     const item: CartItem = {
       id: Date.now(),
-      title: `${currentCategory.title} • ${currentPlan.title}`,
-      category: currentCategory.title,
-      plan: currentPlan.title,
-      duration: currentDuration.title,
-      quantity,
-      total: totalPrice,
+      productId: product.id,
+      title: product.title,
+      category: product.category,
+      tariffTitle: tariff.title,
+      total: tariff.price,
     };
     vibrate("medium");
-    setBalance((prev) => prev - totalPrice);
+    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("success");
+    setBalance((prev) => prev - tariff.price);
     setCart((prev) => [item, ...prev]);
+    setNotice(`Готово: ${item.title} оформлен за ${formatPrice(tariff.price)}.`);
+    setOpenedProductId(null);
     setActiveTab("orders");
-    setNotice(`Готово: ${item.title} оформлен за ${formatPrice(totalPrice)}.`);
   };
 
-  const handleTopUp = () => {
+  const handleTopUp = (amount: number) => {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setNotice("Введи корректную сумму пополнения.");
+      return;
+    }
     vibrate("light");
-    setBalance((prev) => prev + 1000);
-    setNotice("Баланс пополнен на 1 000 ₽ для демо-проверки мини-аппа.");
-  };
-
-  const resetDemo = () => {
-    vibrate("light");
-    setBalance(1200);
-    setCart([]);
-    setQuantity(1);
-    setSelectedPlan("private");
-    setSelectedCategory("soft");
-    setSelectedDuration("month");
-    setNotice("Демо-данные сброшены. Интерфейс готов к новым тестам.");
+    setBalance((prev) => prev + amount);
+    setNotice(`Баланс пополнен на ${formatPrice(amount)}.`);
   };
 
   return (
     <div className="min-h-screen bg-[#05010d] text-white">
       <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden">
+        {/* Фоновые блики */}
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -top-16 left-[-52px] h-60 w-60 rounded-full bg-fuchsia-600/30 blur-3xl" />
           <div className="absolute right-[-40px] top-48 h-64 w-64 rounded-full bg-violet-600/25 blur-3xl" />
           <div className="absolute bottom-16 left-10 h-44 w-44 rounded-full bg-indigo-500/20 blur-3xl" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.22),transparent_34%),linear-gradient(180deg,#0b0618_0%,#05010d_40%,#090312_100%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(125deg,rgba(168,85,247,0.12),transparent_30%,rgba(67,56,202,0.1)_68%,transparent)]" />
         </div>
 
-        <header className="sticky top-0 z-20 border-b border-white/10 bg-black/35 backdrop-blur-2xl">
+        {/* Шапка */}
+        <header className="sticky top-0 z-20 border-b border-white/10 bg-black/40 backdrop-blur-2xl">
           <div className="flex items-center justify-between px-4 pb-4 pt-4">
-            <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (openedProduct) {
+                  setOpenedProductId(null);
+                  return;
+                }
+                setActiveTab("catalog");
+              }}
+              className="flex items-center gap-3"
+            >
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-500 to-violet-600 text-xl shadow-[0_0_40px_rgba(168,85,247,0.42)]">
                 ✦
               </div>
-              <div>
-                <div className="text-[28px] font-black tracking-[0.22em] text-white">YUKI</div>
-                <div className="text-[11px] uppercase tracking-[0.28em] text-violet-200/65">
+              <div className="text-left">
+                <div className="text-[24px] font-black tracking-[0.22em] text-white">YUKI</div>
+                <div className="text-[10px] uppercase tracking-[0.28em] text-violet-200/65">
                   soft bot mini app
                 </div>
               </div>
-            </div>
-            <div className="rounded-full border border-violet-300/15 bg-white/5 px-3 py-2 shadow-[0_8px_30px_rgba(0,0,0,0.32)]">
-              <div className="text-[10px] uppercase tracking-[0.32em] text-violet-200/55">Баланс</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                vibrate("light");
+                setOpenedProductId(null);
+                setActiveTab("balance");
+              }}
+              className="rounded-full border border-violet-300/15 bg-white/5 px-3 py-2 text-left shadow-[0_8px_30px_rgba(0,0,0,0.32)] transition active:scale-95"
+            >
+              <div className="text-[10px] uppercase tracking-[0.32em] text-violet-200/55">
+                Баланс
+              </div>
               <div className="mt-1 flex items-center gap-2 text-sm font-semibold text-amber-300">
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-400/15 text-xs">
                   ₽
                 </span>
                 {formatPrice(balance)}
               </div>
-            </div>
+            </button>
           </div>
         </header>
 
+        {/* Основной контент */}
         <main className="relative z-10 flex-1 overflow-y-auto px-4 pb-32 pt-4">
-          {activeTab === "catalog" && (
+          {/* ───── СТРАНИЦА ТОВАРА ───── */}
+          {openedProduct ? (
             <div className="space-y-5">
-              <SectionCard className="overflow-hidden bg-white/[0.03]">
-                <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-violet-400/50 to-transparent" />
-                <p className="text-xs uppercase tracking-[0.38em] text-violet-200/60">YUKI soft catalog</p>
-                <h1 className="mt-3 text-4xl font-semibold leading-none text-white">
-                  Выбери
-                  <br />
-                  формат YUKI
-                </h1>
-                <div className="mt-6 flex flex-wrap gap-3">
-                  {plans.map((plan) => {
-                    const isActive = plan.id === currentPlan.id;
-                    const previewPrice = Math.round(currentCategory.basePrice * plan.multiplier);
-                    return (
-                      <button
-                        key={plan.id}
-                        type="button"
-                        onClick={() => {
-                          vibrate("light");
-                          setSelectedPlan(plan.id);
-                        }}
-                        className={`relative min-w-[150px] flex-1 overflow-hidden rounded-full border px-4 py-3 text-left transition-all duration-200 ${
-                          isActive
-                            ? `border-white/30 bg-gradient-to-r ${plan.gradient} text-white shadow-[0_0_40px_rgba(168,85,247,0.3)]`
-                            : "border-white/10 bg-white/5 text-white/85"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-[13px] font-semibold uppercase tracking-[0.22em]">{plan.title}</div>
-                            <div className="mt-1 text-xs text-white/70">{plan.subtitle}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-semibold">от {formatPrice(previewPrice)}</div>
-                            <div className="mt-1 rounded-full bg-black/20 px-2 py-0.5 text-[10px] uppercase tracking-[0.22em] text-white/80">
-                              {plan.badge}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
+              <button
+                type="button"
+                onClick={() => {
+                  vibrate("light");
+                  setOpenedProductId(null);
+                }}
+                className="flex items-center gap-2 text-sm text-violet-100/65"
+              >
+                <span className="text-lg">←</span> Назад к каталогу
+              </button>
+
+              <SectionCard className="overflow-hidden p-0">
+                <div className="h-56 w-full overflow-hidden">
+                  <ProductImage src={openedProduct.image} title={openedProduct.title} />
                 </div>
-              </SectionCard>
-
-              <div className="flex items-center gap-3 px-1">
-                <h2 className="text-[22px] font-semibold text-white">Выбери раздел</h2>
-                <div className="h-px flex-1 bg-white/10" />
-                <span className="text-2xl text-violet-200/65">→</span>
-              </div>
-
-              <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {categories.map((category) => {
-                  const isActive = category.id === currentCategory.id;
-                  const pricePreview = Math.round(category.basePrice * currentPlan.multiplier);
-                  return (
-                    <button
-                      key={category.id}
-                      type="button"
-                      onClick={() => {
-                        vibrate("light");
-                        setSelectedCategory(category.id);
-                      }}
-                      className={`min-w-[250px] rounded-[28px] border p-4 text-left transition-all duration-200 ${
-                        isActive
-                          ? "border-violet-300/30 bg-gradient-to-r from-violet-500/25 to-indigo-500/20 shadow-[0_0_40px_rgba(99,102,241,0.2)]"
-                          : "border-white/10 bg-black/20"
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br ${category.gradient} text-2xl shadow-lg`}>
-                          {category.icon}
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-2xl font-medium text-white">{category.title}</div>
-                          <div className="mt-1 text-sm text-violet-100/55">{category.short}</div>
-                        </div>
-                      </div>
-                      <div className="mt-4 flex items-end justify-between">
-                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.3em] text-violet-100/65">
-                          {category.code}
-                        </span>
-                        <div className="text-right text-2xl font-medium text-white/85">{formatPrice(pricePreview)}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <SectionCard className="relative overflow-hidden bg-[linear-gradient(180deg,rgba(10,15,28,0.75),rgba(4,6,16,0.86))]">
-                <div className="absolute inset-y-0 right-0 w-32 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.2),transparent_70%)]" />
-                <div className="relative z-10">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-violet-100/80">
-                        <span className="h-2.5 w-2.5 rounded-full bg-violet-400 shadow-[0_0_18px_rgba(168,85,247,1)]" />
-                        {currentPlan.title}
-                        <span className="text-white/25">|</span>
-                        {currentCategory.code}
-                      </div>
-                      <h3 className="mt-5 text-3xl font-semibold text-white">{currentCategory.title}</h3>
-                      <p className="mt-3 max-w-[280px] text-sm leading-6 text-violet-100/55">{currentCategory.description}</p>
-                    </div>
-                    <div className="rounded-[24px] border border-violet-300/20 bg-violet-500/10 px-4 py-3 text-right shadow-[0_0_30px_rgba(168,85,247,0.18)]">
-                      <div className="text-[11px] uppercase tracking-[0.32em] text-violet-100/45">Цена</div>
-                      <div className="mt-2 text-2xl font-semibold text-white">{formatPrice(unitPrice)}</div>
-                    </div>
+                <div className="p-5">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.28em] text-violet-100/70">
+                    {categories.find((c) => c.id === openedProduct.category)?.title}
                   </div>
+                  <h1 className="mt-3 text-3xl font-semibold text-white">{openedProduct.title}</h1>
+                  <p className="mt-1 text-sm text-violet-100/55">{openedProduct.short}</p>
+
+                  <p className="mt-4 text-sm leading-6 text-violet-100/70">
+                    {openedProduct.description}
+                  </p>
+
                   <div className="mt-5 flex flex-wrap gap-2">
-                    {currentCategory.features.map((feature) => (
-                      <span key={feature} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-violet-50/75">
-                        {feature}
+                    {openedProduct.features.map((f) => (
+                      <span
+                        key={f}
+                        className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-violet-50/80"
+                      >
+                        {f}
                       </span>
                     ))}
                   </div>
-                  <div className="mt-5 space-y-3">
-                    <div className="rounded-2xl border border-white/8 bg-black/15 px-4 py-3 text-sm text-violet-100/65">
-                      Подходит для Telegram Mini App и оформлен в стиле твоего фиолетового YUKI.
-                    </div>
-                    <div className="rounded-2xl border border-white/8 bg-black/15 px-4 py-3 text-sm text-violet-100/65">
-                      Стоимость показана за <span className="text-white">{currentDuration.title.toLowerCase()}</span>.
-                    </div>
-                  </div>
                 </div>
               </SectionCard>
 
-              <SectionCard className="bg-[linear-gradient(180deg,rgba(5,12,23,0.72),rgba(3,7,18,0.85))]">
-                <h3 className="text-2xl font-semibold text-white">Выбери срок</h3>
-                <div className="mt-5 grid grid-cols-3 gap-3">
-                  {durations.map((duration) => {
-                    const isActive = duration.id === currentDuration.id;
-                    return (
-                      <button
-                        key={duration.id}
-                        type="button"
-                        onClick={() => {
-                          vibrate("light");
-                          setSelectedDuration(duration.id);
-                        }}
-                        className={`rounded-[24px] border px-3 py-4 text-left transition-all duration-200 ${
-                          isActive
-                            ? "border-violet-200/35 bg-gradient-to-r from-violet-500/35 to-indigo-500/25 shadow-[0_0_28px_rgba(139,92,246,0.22)]"
-                            : "border-white/10 bg-black/15"
-                        }`}
-                      >
-                        <div className="text-lg font-semibold text-white">{duration.title}</div>
-                        <div className="mt-1 text-xs text-violet-100/55">{duration.subtitle}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="mt-4 text-sm leading-6 text-violet-100/50">
-                  Перед оформлением можно быстро переключить срок доступа и сразу увидеть, как меняется итоговая цена.
-                </p>
-              </SectionCard>
-
-              <SectionCard className="bg-[linear-gradient(180deg,rgba(8,14,28,0.82),rgba(2,7,18,0.92))]">
-                <h3 className="text-2xl font-semibold text-white">Выбери количество</h3>
-                <div className="mt-5 flex items-center gap-4">
-                  <div className="flex h-20 w-24 items-center justify-center rounded-[24px] border border-white/10 bg-black/15 text-3xl font-semibold text-white">
-                    {quantity}
-                  </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={5}
-                    step={1}
-                    value={quantity}
-                    onChange={(event) => setQuantity(Number(event.target.value))}
-                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/20 accent-violet-400"
-                  />
-                </div>
-                <div className="mt-6 rounded-[24px] border border-white/8 bg-black/20 p-4">
-                  <div className="flex items-center justify-between text-sm text-violet-100/60">
-                    <span>{currentPlan.title} • {currentCategory.title}</span>
-                    <span>{formatPrice(unitPrice)}</span>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between text-sm text-violet-100/60">
-                    <span>Количество</span>
-                    <span>{quantity} шт.</span>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between text-sm text-violet-100/60">
-                    <span>Срок</span>
-                    <span>{currentDuration.title}</span>
-                  </div>
-                  <div className="mt-4 h-px bg-white/10" />
-                  <div className="mt-4 flex items-center justify-between text-xl font-semibold text-white">
-                    <span>Итого</span>
-                    <span>{formatPrice(totalPrice)}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handlePurchase}
-                  className="mt-6 flex w-full items-center justify-center gap-3 rounded-[24px] bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500 px-5 py-4 text-base font-semibold text-white shadow-[0_12px_40px_rgba(139,92,246,0.38)] transition-transform duration-200 active:scale-[0.99]"
-                >
-                  <span className="text-lg">✦</span>
-                  {balance >= totalPrice
-                    ? `Купить за ${formatPrice(totalPrice)}`
-                    : `Не хватает ${formatPrice(totalPrice - balance)}`}
-                </button>
-              </SectionCard>
-            </div>
-          )}
-
-          {activeTab === "orders" && (
-            <div className="space-y-5">
               <SectionCard>
-                <p className="text-xs uppercase tracking-[0.35em] text-violet-200/55">YUKI orders</p>
-                <h2 className="mt-3 text-3xl font-semibold text-white">Твои заказы</h2>
-                <p className="mt-2 text-sm leading-6 text-violet-100/55">
-                  Здесь отображаются оформленные позиции из мини-аппа. Вся история сохраняется локально для демо.
+                <h2 className="text-xl font-semibold text-white">Выбери тариф</h2>
+                <p className="mt-1 text-sm text-violet-100/55">
+                  Цена показана за выбранный срок. Оплата спишется с твоего баланса.
                 </p>
-              </SectionCard>
-
-              {cart.length === 0 ? (
-                <SectionCard className="text-center">
-                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/5 text-3xl text-violet-200/70">◉</div>
-                  <h3 className="mt-4 text-2xl font-semibold text-white">Пока пусто</h3>
-                  <p className="mt-2 text-sm leading-6 text-violet-100/55">
-                    Выбери раздел, настрой пакет и оформи первую покупку в каталоге.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("catalog")}
-                    className="mt-5 rounded-full border border-violet-300/20 bg-violet-500/10 px-5 py-3 text-sm font-semibold text-violet-100"
-                  >
-                    Перейти в каталог
-                  </button>
-                </SectionCard>
-              ) : (
-                <>
-                  <div className="space-y-3">
-                    {cart.map((item) => (
-                      <SectionCard key={item.id} className="p-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <div className="text-lg font-semibold text-white">{item.title}</div>
-                            <div className="mt-2 text-sm text-violet-100/55">
-                              {item.duration} • {item.quantity} шт. • {item.category}
-                            </div>
-                          </div>
-                          <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-amber-300">
-                            {formatPrice(item.total)}
-                          </div>
-                        </div>
-                      </SectionCard>
-                    ))}
-                  </div>
-
-                  <SectionCard>
-                    <div className="flex items-center justify-between text-sm text-violet-100/60">
-                      <span>Оформлено товаров</span>
-                      <span>{cart.length}</span>
-                    </div>
-                    <div className="mt-3 flex items-center justify-between text-xl font-semibold text-white">
-                      <span>Общая сумма</span>
-                      <span>{formatPrice(totalOrdersPrice)}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        vibrate("light");
-                        setCart([]);
-                        setNotice("История заказов очищена.");
-                      }}
-                      className="mt-5 w-full rounded-[22px] border border-white/10 bg-white/5 px-5 py-4 text-sm font-semibold text-violet-100"
+                <div className="mt-4 space-y-3">
+                  {openedProduct.tariffs.map((tariff) => (
+                    <div
+                      key={tariff.id}
+                      className="flex items-center justify-between rounded-[22px] border border-white/10 bg-black/25 p-4"
                     >
-                      Очистить историю
-                    </button>
-                  </SectionCard>
-                </>
-              )}
-            </div>
-          )}
-
-          {activeTab === "profile" && (
-            <div className="space-y-5">
-              <SectionCard className="text-center">
-                {user.photo_url ? (
-                  <img
-                    src={user.photo_url}
-                    alt={user.first_name || "YUKI user"}
-                    className="mx-auto h-24 w-24 rounded-full border-4 border-violet-400/25 object-cover shadow-[0_0_40px_rgba(168,85,247,0.22)]"
-                  />
-                ) : (
-                  <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 to-violet-600 text-3xl font-black shadow-[0_0_40px_rgba(168,85,247,0.25)]">
-                    {avatarLetter}
-                  </div>
-                )}
-                <h2 className="mt-4 text-3xl font-semibold text-white">{user.first_name || "Пользователь YUKI"}</h2>
-                <div className="mt-2 text-sm text-violet-100/55">@{user.username || "yuki_soft_user"}</div>
-                <div className="mt-6 grid grid-cols-2 gap-3 text-left">
-                  <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-                    <div className="text-[11px] uppercase tracking-[0.28em] text-violet-100/45">Баланс</div>
-                    <div className="mt-2 text-xl font-semibold text-amber-300">{formatPrice(balance)}</div>
-                  </div>
-                  <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-                    <div className="text-[11px] uppercase tracking-[0.28em] text-violet-100/45">Заказов</div>
-                    <div className="mt-2 text-xl font-semibold text-white">{cart.length}</div>
-                  </div>
-                </div>
-              </SectionCard>
-
-              <SectionCard>
-                <h3 className="text-2xl font-semibold text-white">Управление демо</h3>
-                <p className="mt-3 text-sm leading-6 text-violet-100/55">
-                  Чтобы мини-апп было удобно тестировать, я добавил демо-пополнение и быстрый сброс данных.
-                </p>
-                <div className="mt-5 space-y-3">
-                  <button
-                    type="button"
-                    onClick={handleTopUp}
-                    className="w-full rounded-[24px] bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 py-4 text-base font-semibold text-white shadow-[0_12px_36px_rgba(168,85,247,0.28)]"
-                  >
-                    Пополнить баланс +1 000 ₽
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetDemo}
-                    className="w-full rounded-[24px] border border-white/10 bg-white/5 px-5 py-4 text-sm font-semibold text-violet-100"
-                  >
-                    Сбросить демо-данные
-                  </button>
-                </div>
-              </SectionCard>
-
-              <SectionCard>
-                <h3 className="text-2xl font-semibold text-white">О мини-аппе</h3>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {["Фиолетовая тема", "Telegram ready", "Bottom navigation", "Сохранение данных", "Мобильная верстка"].map((chip) => (
-                    <span key={chip} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-violet-100/70">
-                      {chip}
-                    </span>
+                      <div>
+                        <div className="text-lg font-semibold text-white">{tariff.title}</div>
+                        <div className="text-xs text-violet-100/55">{tariff.subtitle}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleBuyTariff(openedProduct, tariff)}
+                        className="rounded-full bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(139,92,246,0.4)] active:scale-95"
+                      >
+                        {formatPrice(tariff.price)}
+                      </button>
+                    </div>
                   ))}
                 </div>
               </SectionCard>
             </div>
+          ) : (
+            <>
+              {/* ───── КАТАЛОГ ───── */}
+              {activeTab === "catalog" && (
+                <div className="space-y-5">
+                  <SectionCard className="bg-white/[0.03]">
+                    <p className="text-xs uppercase tracking-[0.38em] text-violet-200/60">
+                      YUKI soft catalog
+                    </p>
+                    <h1 className="mt-3 text-3xl font-semibold leading-tight text-white">
+                      Выбери категорию
+                      <br />
+                      и открой товар
+                    </h1>
+                    <p className="mt-3 text-sm leading-6 text-violet-100/55">
+                      «YUKI Soft» — фильтр со всеми товарами. Остальные кнопки — фильтрация по
+                      разделам.
+                    </p>
+                  </SectionCard>
+
+                  {/* Фильтр-категории */}
+                  <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {categories.map((cat) => {
+                      const isActive = cat.id === selectedCategory;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            vibrate("light");
+                            setSelectedCategory(cat.id);
+                          }}
+                          className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm transition ${
+                            isActive
+                              ? "border-violet-300/40 bg-gradient-to-r from-violet-500/50 to-fuchsia-500/40 text-white shadow-[0_0_25px_rgba(168,85,247,0.3)]"
+                              : "border-white/10 bg-white/5 text-violet-100/75"
+                          }`}
+                        >
+                          <span>{cat.icon}</span>
+                          <span className="font-medium">{cat.title}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Список товаров */}
+                  <div className="space-y-4">
+                    {visibleProducts.length === 0 ? (
+                      <SectionCard className="text-center text-violet-100/60">
+                        В этом разделе пока пусто.
+                      </SectionCard>
+                    ) : (
+                      visibleProducts.map((product) => {
+                        const minPrice = Math.min(...product.tariffs.map((t) => t.price));
+                        return (
+                          <button
+                            key={product.id}
+                            type="button"
+                            onClick={() => {
+                              vibrate("light");
+                              setOpenedProductId(product.id);
+                            }}
+                            className="block w-full overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.045] text-left shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl transition active:scale-[0.99]"
+                          >
+                            <div className="h-44 w-full overflow-hidden">
+                              <ProductImage src={product.image} title={product.title} />
+                            </div>
+                            <div className="p-4">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1">
+                                  <div className="text-lg font-semibold text-white">
+                                    {product.title}
+                                  </div>
+                                  <div className="mt-1 text-sm text-violet-100/55">
+                                    {product.short}
+                                  </div>
+                                </div>
+                                <div className="rounded-2xl border border-violet-300/20 bg-violet-500/10 px-3 py-2 text-right">
+                                  <div className="text-[10px] uppercase tracking-[0.22em] text-violet-100/60">
+                                    от
+                                  </div>
+                                  <div className="text-sm font-semibold text-amber-300">
+                                    {formatPrice(minPrice)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mt-3 inline-flex items-center gap-2 text-xs text-violet-100/55">
+                                <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1">
+                                  {categories.find((c) => c.id === product.category)?.title}
+                                </span>
+                                <span className="text-violet-200/60">Открыть →</span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ───── ЗАКАЗЫ ───── */}
+              {activeTab === "orders" && (
+                <div className="space-y-5">
+                  <SectionCard>
+                    <p className="text-xs uppercase tracking-[0.35em] text-violet-200/55">
+                      YUKI orders
+                    </p>
+                    <h2 className="mt-3 text-3xl font-semibold text-white">Твои заказы</h2>
+                    <p className="mt-2 text-sm leading-6 text-violet-100/55">
+                      Здесь оформленные позиции. История сохраняется локально.
+                    </p>
+                  </SectionCard>
+
+                  {cart.length === 0 ? (
+                    <SectionCard className="text-center">
+                      <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/5 text-3xl text-violet-200/70">
+                        ◉
+                      </div>
+                      <h3 className="mt-4 text-2xl font-semibold text-white">Пока пусто</h3>
+                      <p className="mt-2 text-sm leading-6 text-violet-100/55">
+                        Выбери раздел и оформи первую покупку.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("catalog")}
+                        className="mt-5 rounded-full border border-violet-300/20 bg-violet-500/10 px-5 py-3 text-sm font-semibold text-violet-100"
+                      >
+                        В каталог
+                      </button>
+                    </SectionCard>
+                  ) : (
+                    <>
+                      <div className="space-y-3">
+                        {cart.map((item) => (
+                          <SectionCard key={item.id} className="p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <div className="text-lg font-semibold text-white">
+                                  {item.title}
+                                </div>
+                                <div className="mt-2 text-sm text-violet-100/55">
+                                  {item.tariffTitle} • {item.category}
+                                </div>
+                              </div>
+                              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-amber-300">
+                                {formatPrice(item.total)}
+                              </div>
+                            </div>
+                          </SectionCard>
+                        ))}
+                      </div>
+
+                      <SectionCard>
+                        <div className="flex items-center justify-between text-sm text-violet-100/60">
+                          <span>Оформлено товаров</span>
+                          <span>{cart.length}</span>
+                        </div>
+                        <div className="mt-3 flex items-center justify-between text-xl font-semibold text-white">
+                          <span>Сумма</span>
+                          <span>{formatPrice(totalOrdersPrice)}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            vibrate("light");
+                            setCart([]);
+                            setNotice("История заказов очищена.");
+                          }}
+                          className="mt-5 w-full rounded-[22px] border border-white/10 bg-white/5 px-5 py-4 text-sm font-semibold text-violet-100"
+                        >
+                          Очистить историю
+                        </button>
+                      </SectionCard>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ───── БАЛАНС ───── */}
+              {activeTab === "balance" && (
+                <div className="space-y-5">
+                  <SectionCard className="overflow-hidden bg-[linear-gradient(135deg,rgba(168,85,247,0.25),rgba(99,102,241,0.18))]">
+                    <p className="text-xs uppercase tracking-[0.35em] text-violet-200/65">
+                      Твой баланс
+                    </p>
+                    <div className="mt-3 text-5xl font-black tracking-tight text-amber-300">
+                      {formatPrice(balance)}
+                    </div>
+                    <p className="mt-2 text-sm text-violet-100/55">
+                      Используется для оплаты любого товара YUKI.
+                    </p>
+                  </SectionCard>
+
+                  <SectionCard>
+                    <h3 className="text-xl font-semibold text-white">Быстрое пополнение</h3>
+                    <div className="mt-4 grid grid-cols-3 gap-3">
+                      {[100, 500, 1000, 2000, 5000, 10000].map((amount) => (
+                        <button
+                          key={amount}
+                          type="button"
+                          onClick={() => handleTopUp(amount)}
+                          className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm font-semibold text-white transition active:scale-95"
+                        >
+                          +{formatPrice(amount)}
+                        </button>
+                      ))}
+                    </div>
+                  </SectionCard>
+
+                  <SectionCard>
+                    <h3 className="text-xl font-semibold text-white">Своя сумма</h3>
+                    <div className="mt-4 flex gap-3">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={topUpAmount}
+                        onChange={(e) => setTopUpAmount(e.target.value)}
+                        className="flex-1 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-base text-white outline-none focus:border-violet-300/40"
+                        placeholder="₽"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const v = Number(topUpAmount);
+                          handleTopUp(v);
+                        }}
+                        className="rounded-2xl bg-gradient-to-r from-fuchsia-500 to-violet-500 px-5 py-3 text-sm font-semibold text-white"
+                      >
+                        Пополнить
+                      </button>
+                    </div>
+                    <p className="mt-3 text-xs text-violet-100/45">
+                      Демо-режим: пополнение тестовое, без реальной оплаты.
+                    </p>
+                  </SectionCard>
+                </div>
+              )}
+
+              {/* ───── ПРОФИЛЬ ───── */}
+              {activeTab === "profile" && (
+                <div className="space-y-5">
+                  <SectionCard className="text-center">
+                    {user.photo_url ? (
+                      <img
+                        src={user.photo_url}
+                        alt={user.first_name || "YUKI user"}
+                        className="mx-auto h-24 w-24 rounded-full border-4 border-violet-400/25 object-cover shadow-[0_0_40px_rgba(168,85,247,0.22)]"
+                      />
+                    ) : (
+                      <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 to-violet-600 text-3xl font-black shadow-[0_0_40px_rgba(168,85,247,0.25)]">
+                        {avatarLetter}
+                      </div>
+                    )}
+                    <h2 className="mt-4 text-3xl font-semibold text-white">
+                      {user.first_name || "Пользователь YUKI"}
+                    </h2>
+                    <div className="mt-2 text-sm text-violet-100/55">
+                      @{user.username || "yuki_soft_user"}
+                    </div>
+
+                    <div className="mt-6 grid grid-cols-2 gap-3 text-left">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("balance")}
+                        className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-left transition active:scale-95"
+                      >
+                        <div className="text-[11px] uppercase tracking-[0.28em] text-violet-100/45">
+                          Баланс
+                        </div>
+                        <div className="mt-2 text-xl font-semibold text-amber-300">
+                          {formatPrice(balance)}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("orders")}
+                        className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-left transition active:scale-95"
+                      >
+                        <div className="text-[11px] uppercase tracking-[0.28em] text-violet-100/45">
+                          Заказов
+                        </div>
+                        <div className="mt-2 text-xl font-semibold text-white">{cart.length}</div>
+                      </button>
+                    </div>
+                  </SectionCard>
+
+                  <SectionCard>
+                    <h3 className="text-xl font-semibold text-white">О мини-аппе</h3>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {[
+                        "Фиолетовая тема",
+                        "Telegram ready",
+                        "Категории-фильтры",
+                        "Страница товара",
+                        "Отдельный баланс",
+                      ].map((chip) => (
+                        <span
+                          key={chip}
+                          className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-violet-100/70"
+                        >
+                          {chip}
+                        </span>
+                      ))}
+                    </div>
+                  </SectionCard>
+                </div>
+              )}
+            </>
           )}
         </main>
 
-        <nav className="fixed bottom-0 left-0 right-0 z-30 mx-auto w-full max-w-md border-t border-white/10 bg-black/55 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-2xl">
-          <div className="grid grid-cols-3 gap-2">
+        {/* Нижняя навигация */}
+        <nav className="fixed bottom-0 left-0 right-0 z-30 mx-auto w-full max-w-md border-t border-white/10 bg-black/65 px-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-2xl">
+          <div className="grid grid-cols-4 gap-1">
             {navItems.map((item) => {
-              const isActive = item.id === activeTab;
+              const isActive = item.id === activeTab && !openedProduct;
               return (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => {
                     vibrate("light");
+                    setOpenedProductId(null);
                     setActiveTab(item.id);
                   }}
-                  className={`flex flex-col items-center justify-center rounded-[20px] px-3 py-3 text-center transition-all duration-200 ${
+                  className={`flex flex-col items-center justify-center rounded-[18px] px-2 py-2 text-center transition-all duration-200 ${
                     isActive
-                      ? "bg-gradient-to-b from-violet-500/25 to-indigo-500/15 text-amber-300"
+                      ? "bg-gradient-to-b from-violet-500/30 to-indigo-500/15 text-amber-300"
                       : "text-violet-100/60"
                   }`}
                 >
                   <span className="text-lg">{item.icon}</span>
-                  <span className="mt-1 text-xs font-medium">{item.label}</span>
+                  <span className="mt-1 text-[11px] font-medium">{item.label}</span>
                 </button>
               );
             })}
           </div>
         </nav>
 
+        {/* Toast */}
         {notice && (
-          <div className="pointer-events-none fixed bottom-28 left-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-violet-300/20 bg-black/70 px-4 py-3 text-sm text-violet-50 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+          <div className="pointer-events-none fixed bottom-28 left-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-violet-300/20 bg-black/75 px-4 py-3 text-sm text-violet-50 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
             {notice}
+          </div>
+        )}
+
+        {/* Модалка "Недостаточно средств" */}
+        {noFundsModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5 backdrop-blur-md">
+            <div className="w-full max-w-sm rounded-[28px] border border-violet-300/20 bg-[#0d0420] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.6)]">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-500/20 text-2xl">
+                ⚠️
+              </div>
+              <h3 className="mt-4 text-center text-xl font-semibold text-white">
+                Недостаточно средств
+              </h3>
+              <p className="mt-2 text-center text-sm text-violet-100/65">
+                Для покупки <span className="text-white">{noFundsModal.title}</span> не хватает{" "}
+                <span className="font-semibold text-amber-300">
+                  {formatPrice(noFundsModal.needed)}
+                </span>
+                .
+              </p>
+
+              <div className="mt-6 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNoFundsModal(null);
+                    setOpenedProductId(null);
+                    setActiveTab("balance");
+                  }}
+                  className="w-full rounded-2xl bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500 px-5 py-4 text-base font-semibold text-white shadow-[0_12px_36px_rgba(168,85,247,0.4)]"
+                >
+                  Пополнить баланс
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNoFundsModal(null)}
+                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-base font-semibold text-violet-100"
+                >
+                  Ок
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
