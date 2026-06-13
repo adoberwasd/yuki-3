@@ -220,7 +220,7 @@ const payMethods: PayMethod[] = [
     id: "sbp",
     title: "СБП",
     hint: "Система быстрых платежей",
-    logo: "",
+    logo: "https://i.ibb.co/TM4Bk4Gb/3-DD14-F7-F-9-D57-4426-B5-B4-332-CD9-CBA1-FC.png",
     maxAmount: 700,
     unit: "₽",
     accent: "from-emerald-500/20 to-violet-500/15",
