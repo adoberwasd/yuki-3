@@ -87,7 +87,7 @@ const products: Product[] = [
     short: "Приватный софт для Standoff 2",
     description:
       "Фирменный YUKI iPA под Standoff 2: стабильная сборка, аккуратная работа и регулярные обновления под актуальные версии игры.",
-    image: "https://i.ibb.co/ymzPtBhj/IMG-1143.jpg",
+    image: "",
     platform: "iOS",
     features: ["iPA сборка", "Стабильно", "Обновления", "Поддержка"],
     tariffs: [
@@ -464,10 +464,13 @@ export default function App() {
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-16 left-[-52px] h-60 w-60 rounded-full bg-fuchsia-600/30 blur-3xl" />
-          <div className="absolute right-[-40px] top-48 h-64 w-64 rounded-full bg-violet-600/25 blur-3xl" />
-          <div className="absolute bottom-16 left-10 h-44 w-44 rounded-full bg-indigo-500/20 blur-3xl" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.22),transparent_34%),linear-gradient(180deg,#0b0618_0%,#05010d_40%,#090312_100%)]" />
+          {/* Базовая заливка — насыщенный тёмный фиолет */}
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,#0b0420_0%,#0a0320_40%,#0c0524_100%)]" />
+          {/* Блики живые, но мягкие */}
+          <div className="absolute -top-24 left-[-50px] h-64 w-64 rounded-full bg-fuchsia-600/20 blur-3xl" />
+          <div className="absolute right-[-50px] top-[420px] h-72 w-72 rounded-full bg-violet-600/18 blur-3xl" />
+          <div className="absolute bottom-32 left-8 h-48 w-48 rounded-full bg-indigo-500/15 blur-3xl" />
+          <div className="absolute right-12 bottom-[-40px] h-44 w-44 rounded-full bg-fuchsia-500/12 blur-3xl" />
         </div>
 
         <header className="sticky top-0 z-20 border-b border-white/10 bg-black/40 backdrop-blur-2xl">
@@ -501,13 +504,13 @@ export default function App() {
                 setOpenedProductId(null);
                 setActiveTab("balance");
               }}
-              className="rounded-full border border-violet-300/15 bg-white/5 px-3 py-2 text-left shadow-[0_8px_30px_rgba(0,0,0,0.32)] transition active:scale-95"
+              className="flex flex-col items-center rounded-full border border-violet-300/15 bg-white/5 px-4 py-2 shadow-[0_8px_30px_rgba(0,0,0,0.32)] transition active:scale-95"
             >
-              <div className="text-[10px] uppercase tracking-[0.32em] text-violet-200/55">
+              <div className="text-[9px] uppercase tracking-[0.3em] text-violet-200/55">
                 Баланс
               </div>
-              <div className="mt-1 flex items-center gap-2 text-sm font-semibold text-amber-300">
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-400/15 text-xs">
+              <div className="mt-0.5 flex items-center gap-1.5 text-sm font-semibold text-white">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-violet-500/25 text-[11px] text-violet-100">
                   ₽
                 </span>
                 {formatPrice(balance)}
@@ -618,10 +621,10 @@ export default function App() {
                             vibrate("light");
                             setSelectedCategory(cat.id);
                           }}
-                          className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm transition ${
+                          className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm transition active:scale-95 ${
                             isActive
-                              ? "border-violet-300/40 bg-gradient-to-r from-violet-500/50 to-fuchsia-500/40 text-white shadow-[0_0_25px_rgba(168,85,247,0.3)]"
-                              : "border-white/10 bg-white/5 text-violet-100/75"
+                              ? "border-violet-300/50 bg-gradient-to-r from-[#7c3aed] via-[#8b5cf6] to-[#a855f7] text-white"
+                              : "border-white/10 bg-white/[0.04] text-violet-100/75"
                           }`}
                         >
                           <span>{cat.icon}</span>
@@ -663,13 +666,13 @@ export default function App() {
                                     {product.short}
                                   </div>
                                 </div>
-                                <div className="rounded-2xl border border-violet-300/20 bg-violet-500/10 px-3 py-2 text-right">
-                                  <div className="text-[10px] uppercase tracking-[0.22em] text-violet-100/60">
+                                <div className="flex items-baseline gap-1.5 rounded-2xl border border-violet-300/20 bg-violet-500/10 px-3 py-2">
+                                  <span className="text-[10px] uppercase tracking-[0.22em] text-violet-100/55">
                                     от
-                                  </div>
-                                  <div className="text-sm font-semibold text-amber-300">
+                                  </span>
+                                  <span className="text-sm font-semibold text-white">
                                     {formatPrice(minPrice)}
-                                  </div>
+                                  </span>
                                 </div>
                               </div>
 
@@ -743,7 +746,7 @@ export default function App() {
                                   {item.tariffTitle} • {item.category}
                                 </div>
                               </div>
-                              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-amber-300">
+                              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white">
                                 {formatPrice(item.total)}
                               </div>
                             </div>
@@ -784,7 +787,7 @@ export default function App() {
                     <p className="text-xs uppercase tracking-[0.35em] text-violet-200/65">
                       Твой баланс
                     </p>
-                    <div className="mt-3 text-5xl font-black tracking-tight text-amber-300">
+                    <div className="mt-3 text-5xl font-black tracking-tight text-white">
                       {formatPrice(balance)}
                     </div>
                     <p className="mt-2 text-sm text-violet-100/55">
@@ -887,7 +890,7 @@ export default function App() {
                         </p>
 
                         {rubPreview !== null && (
-                          <p className="mt-1 text-[12px] text-amber-300/80">
+                          <p className="mt-1 text-[12px] text-violet-200/80">
                             ≈ {formatPrice(rubPreview)} на баланс
                           </p>
                         )}
@@ -979,7 +982,7 @@ export default function App() {
                         <div className="text-[11px] uppercase tracking-[0.28em] text-violet-100/45">
                           Баланс
                         </div>
-                        <div className="mt-2 text-xl font-semibold text-amber-300">
+                        <div className="mt-2 text-xl font-semibold text-white">
                           {formatPrice(balance)}
                         </div>
                       </button>
@@ -1036,7 +1039,7 @@ export default function App() {
                   }}
                   className={`flex flex-col items-center justify-center rounded-[18px] px-2 py-2 text-center transition-all duration-200 ${
                     isActive
-                      ? "bg-gradient-to-b from-violet-500/30 to-indigo-500/15 text-amber-300"
+                      ? "bg-gradient-to-b from-violet-500/35 to-indigo-500/15 text-white"
                       : "text-violet-100/60"
                   }`}
                 >
@@ -1065,7 +1068,7 @@ export default function App() {
               </h3>
               <p className="mt-2 text-center text-sm text-violet-100/65">
                 Для покупки <span className="text-white">{noFundsModal.title}</span> не хватает{" "}
-                <span className="font-semibold text-amber-300">
+                <span className="font-semibold text-violet-200">
                   {formatPrice(noFundsModal.needed)}
                 </span>
                 .
@@ -1098,4 +1101,3 @@ export default function App() {
     </div>
   );
 }
-
