@@ -18,13 +18,26 @@ type Product = {
   title: string;
   short: string;
   description: string;
-  image: string; // ← сюда вставляй ссылку на фото
+  image: string;
   platform: Platform;
   features: string[];
   tariffs: Tariff[];
 };
 
+// Товар в корзине (ещё не оплаченный)
 type CartItem = {
+  id: number;
+  productId: string;
+  title: string;
+  category: string;
+  tariffId: DurationId;
+  tariffTitle: string;
+  price: number;
+  qty: number;
+};
+
+// Оплаченный заказ (история)
+type OrderItem = {
   id: number;
   productId: string;
   title: string;
@@ -194,14 +207,13 @@ const products: Product[] = [
 
 const navItems: { id: TabId; label: string; icon: string }[] = [
   { id: "catalog", label: "Каталог", icon: "◈" },
-  { id: "orders", label: "Заказы", icon: "◉" },
+  { id: "orders", label: "Корзина", icon: "🛒" },
   { id: "balance", label: "Баланс", icon: "₽" },
   { id: "profile", label: "Профиль", icon: "◎" },
 ];
 
 // ────────────────────────────────────────────────────────────────────────────
 // 💳 МЕТОДЫ ПОПОЛНЕНИЯ
-// Замени logo: "" на прямую ссылку на PNG (i.ibb.co и т.п.)
 // ────────────────────────────────────────────────────────────────────────────
 type PayMethodId = "sbp" | "cryptobot" | "stars" | "crypto";
 
@@ -258,11 +270,6 @@ const STARS_TO_RUB = 1.6;
 const DEBUG_USERNAME = "samarskiyyyy";
 const DEBUG_BALANCE = 1_000_000;
 
-// ────────────────────────────────────────────────────────────────────────────
-// 🏷 БЕЙДЖИ ПЛАТФОРМ (PNG)
-// Вставь сюда прямые ссылки на свои PNG (i.ibb.co / postimg / любая прямая ссылка).
-// Если оставить пустыми ("") — покажется текстовая плашка как fallback.
-// ────────────────────────────────────────────────────────────────────────────
 const PLATFORM_ICONS: Record<Platform, string> = {
   iOS: "https://i.ibb.co/cS7ZS0c5/IMG-1138.png",
   Desktop: "https://i.ibb.co/LzKLYc2f/IMG-1137.png",
@@ -306,10 +313,9 @@ function ProductImage({ src, title }: { src: string; title: string }) {
   );
 }
 
-// Бейдж платформы в правом верхнем углу фото
 function PlatformBadge({ platform }: { platform: Platform }) {
   const iconUrl = PLATFORM_ICONS[platform];
-  const label = platform; // "iOS", "Desktop", "iOS/Android"
+  const label = platform;
 
   return (
     <span className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full border border-violet-300/30 bg-black/55 px-3 py-1 shadow-[0_6px_22px_rgba(0,0,0,0.45)] backdrop-blur-md">
@@ -348,15 +354,29 @@ export default function App() {
     }
     return 0;
   });
+
+  // Корзина — товары, которые юзер положил, но ещё не оплатил
   const [cart, setCart] = useState<CartItem[]>(() => {
     if (typeof window === "undefined") return [];
     try {
-      const saved = window.localStorage.getItem("yuki_cart_history");
+      const saved = window.localStorage.getItem("yuki_cart_pending");
       return saved ? (JSON.parse(saved) as CartItem[]) : [];
     } catch {
       return [];
     }
   });
+
+  // История оплаченных заказов
+  const [orders, setOrders] = useState<OrderItem[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = window.localStorage.getItem("yuki_orders_history");
+      return saved ? (JSON.parse(saved) as OrderItem[]) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [user, setUser] = useState<TelegramUser>({
     first_name: "YUKI user",
     username: "",
@@ -367,8 +387,12 @@ export default function App() {
   }, [balance]);
 
   useEffect(() => {
-    window.localStorage.setItem("yuki_cart_history", JSON.stringify(cart));
+    window.localStorage.setItem("yuki_cart_pending", JSON.stringify(cart));
   }, [cart]);
+
+  useEffect(() => {
+    window.localStorage.setItem("yuki_orders_history", JSON.stringify(orders));
+  }, [orders]);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -416,39 +440,95 @@ export default function App() {
     [openedProductId],
   );
 
-  const totalOrdersPrice = cart.reduce((sum, item) => sum + item.total, 0);
+  const cartTotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const avatarLetter = (user.first_name || "Y").trim().charAt(0).toUpperCase();
 
-  const handleBuyTariff = (product: Product, tariff: Tariff) => {
-    if (balance < tariff.price) {
+  // Добавить тариф в корзину (если уже есть — увеличить количество)
+  const handleAddToCart = (product: Product, tariff: Tariff) => {
+    vibrate("medium");
+    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("success");
+
+    setCart((prev) => {
+      const existing = prev.find(
+        (i) => i.productId === product.id && i.tariffId === tariff.id,
+      );
+      if (existing) {
+        return prev.map((i) =>
+          i.productId === product.id && i.tariffId === tariff.id
+            ? { ...i, qty: i.qty + 1 }
+            : i,
+        );
+      }
+      const newItem: CartItem = {
+        id: Date.now(),
+        productId: product.id,
+        title: product.title,
+        category: product.category,
+        tariffId: tariff.id,
+        tariffTitle: tariff.title,
+        price: tariff.price,
+        qty: 1,
+      };
+      return [newItem, ...prev];
+    });
+
+    setNotice(`${product.title} • ${tariff.title} — добавлено в корзину`);
+  };
+
+  // Изменить количество товара в корзине
+  const updateQty = (cartItemId: number, delta: number) => {
+    vibrate("light");
+    setCart((prev) =>
+      prev
+        .map((i) => (i.id === cartItemId ? { ...i, qty: i.qty + delta } : i))
+        .filter((i) => i.qty > 0),
+    );
+  };
+
+  // Удалить позицию из корзины
+  const removeFromCart = (cartItemId: number) => {
+    vibrate("light");
+    setCart((prev) => prev.filter((i) => i.id !== cartItemId));
+  };
+
+  // Оплата всей корзины
+  const handleCheckout = () => {
+    if (cart.length === 0) return;
+
+    if (balance < cartTotal) {
       vibrate("heavy");
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("error");
       setNoFundsModal({
-        needed: tariff.price - balance,
-        title: `${product.title} • ${tariff.title}`,
+        needed: cartTotal - balance,
+        title: `Корзина (${cartCount} ${cartCount === 1 ? "товар" : "товаров"})`,
       });
       return;
     }
-    const item: CartItem = {
-      id: Date.now(),
-      productId: product.id,
-      title: product.title,
-      category: product.category,
-      tariffTitle: tariff.title,
-      total: tariff.price,
-    };
+
     vibrate("medium");
     window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("success");
-    setBalance((prev) => prev - tariff.price);
-    setCart((prev) => [item, ...prev]);
-    setNotice(`Готово: ${item.title} оформлен за ${formatPrice(tariff.price)}.`);
-    setOpenedProductId(null);
-    setActiveTab("orders");
+
+    // Списываем баланс
+    setBalance((prev) => prev - cartTotal);
+
+    // Превращаем корзину в заказы (история)
+    const newOrders: OrderItem[] = cart.map((item) => ({
+      id: Date.now() + Math.random(),
+      productId: item.productId,
+      title: item.title,
+      category: item.category,
+      tariffTitle: `${item.tariffTitle}${item.qty > 1 ? ` × ${item.qty}` : ""}`,
+      total: item.price * item.qty,
+    }));
+
+    setOrders((prev) => [...newOrders, ...prev]);
+    setCart([]);
+    setNotice(`Оплачено ${formatPrice(cartTotal)}. Спасибо!`);
   };
 
   return (
     <div className="min-h-screen bg-[#05010d] text-white">
-      {/* Кастомные keyframes для пульсации */}
       <style>{`
         @keyframes yukiPulse {
           0%, 100% { transform: scale(1); opacity: 0.55; }
@@ -464,9 +544,7 @@ export default function App() {
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden">
         <div className="pointer-events-none absolute inset-0">
-          {/* Базовая заливка — насыщенный тёмный фиолет */}
           <div className="absolute inset-0 bg-[linear-gradient(180deg,#0b0420_0%,#0a0320_40%,#0c0524_100%)]" />
-          {/* Блики живые, но мягкие */}
           <div className="absolute -top-24 left-[-50px] h-64 w-64 rounded-full bg-fuchsia-600/20 blur-3xl" />
           <div className="absolute right-[-50px] top-[420px] h-72 w-72 rounded-full bg-violet-600/18 blur-3xl" />
           <div className="absolute bottom-32 left-8 h-48 w-48 rounded-full bg-indigo-500/15 blur-3xl" />
@@ -566,7 +644,7 @@ export default function App() {
               <SectionCard>
                 <h2 className="text-xl font-semibold text-white">Выбери тариф</h2>
                 <p className="mt-1 text-sm text-violet-100/55">
-                  Цена показана за выбранный срок. Оплата спишется с твоего баланса.
+                  Тариф добавится в корзину. Оплатишь всё одним нажатием в разделе «Корзина».
                 </p>
                 <div className="mt-4 space-y-3">
                   {openedProduct.tariffs.map((tariff) => (
@@ -580,14 +658,28 @@ export default function App() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleBuyTariff(openedProduct, tariff)}
-                        className="rounded-full bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(139,92,246,0.4)] active:scale-95"
+                        onClick={() => handleAddToCart(openedProduct, tariff)}
+                        className="flex items-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(139,92,246,0.4)] active:scale-95"
                       >
+                        <span className="text-base">🛒</span>
                         {formatPrice(tariff.price)}
                       </button>
                     </div>
                   ))}
                 </div>
+
+                {cart.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenedProductId(null);
+                      setActiveTab("orders");
+                    }}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-violet-300/30 bg-violet-500/15 px-4 py-3 text-sm font-semibold text-violet-100"
+                  >
+                    Перейти в корзину ({cartCount}) →
+                  </button>
+                )}
               </SectionCard>
             </div>
           ) : (
@@ -691,38 +783,39 @@ export default function App() {
                 </div>
               )}
 
-              {/* ───── ЗАКАЗЫ ───── */}
+              {/* ───── КОРЗИНА + ИСТОРИЯ ───── */}
               {activeTab === "orders" && (
                 <div className="space-y-5">
                   <SectionCard>
                     <p className="text-xs uppercase tracking-[0.35em] text-violet-200/55">
-                      YUKI orders
+                      YUKI cart
                     </p>
-                    <h2 className="mt-3 text-3xl font-semibold text-white">Твои заказы</h2>
+                    <h2 className="mt-3 text-3xl font-semibold text-white">Корзина</h2>
                     <p className="mt-2 text-sm leading-6 text-violet-100/55">
-                      Здесь оформленные позиции. История сохраняется локально.
+                      {cart.length === 0
+                        ? "Сейчас пусто. Добавь товар в корзину со страницы товара."
+                        : `В корзине ${cartCount} ${
+                            cartCount === 1 ? "позиция" : "позиций"
+                          } на сумму ${formatPrice(cartTotal)}.`}
                     </p>
                   </SectionCard>
 
                   {cart.length === 0 ? (
                     <SectionCard className="text-center">
-                      {/* Анимированный пульсирующий кружок — тёмный, приглушённый */}
                       <div className="relative mx-auto h-24 w-24">
-                        {/* расходящиеся кольца — почти прозрачные */}
                         <span className="yuki-pulse-ring absolute inset-0 rounded-full border border-violet-300/20 bg-violet-500/10" />
                         <span
                           className="yuki-pulse-ring absolute inset-0 rounded-full border border-violet-300/15 bg-violet-500/5"
                           style={{ animationDelay: "0.8s" }}
                         />
-                        {/* основной круг — тёмный с лёгким фиолетовым оттенком */}
-                        <div className="yuki-pulse-dot relative flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/5 text-2xl text-violet-200/70 backdrop-blur-md">
-                          ◉
+                        <div className="yuki-pulse-dot relative flex h-24 w-24 items-center justify-center rounded-full border border-white/10 bg-white/5 text-3xl text-violet-200/70 backdrop-blur-md">
+                          🛒
                         </div>
                       </div>
 
-                      <h3 className="mt-6 text-2xl font-semibold text-white">Пока пусто</h3>
+                      <h3 className="mt-6 text-2xl font-semibold text-white">Корзина пуста</h3>
                       <p className="mt-2 text-sm leading-6 text-violet-100/55">
-                        Выбери раздел и оформи первую покупку.
+                        Выбери раздел и добавь товар.
                       </p>
                       <button
                         type="button"
@@ -734,15 +827,113 @@ export default function App() {
                     </SectionCard>
                   ) : (
                     <>
+                      {/* Список позиций в корзине */}
                       <div className="space-y-3">
                         {cart.map((item) => (
                           <SectionCard key={item.id} className="p-4">
-                            <div className="flex items-start justify-between gap-4">
-                              <div>
-                                <div className="text-lg font-semibold text-white">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1">
+                                <div className="text-base font-semibold text-white">
                                   {item.title}
                                 </div>
-                                <div className="mt-2 text-sm text-violet-100/55">
+                                <div className="mt-1 text-xs text-violet-100/55">
+                                  Тариф: {item.tariffTitle}
+                                </div>
+                                <div className="mt-3 inline-flex items-center gap-3 rounded-full border border-white/10 bg-black/25 px-2 py-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateQty(item.id, -1)}
+                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-white/5 text-base font-semibold text-violet-100 active:scale-95"
+                                  >
+                                    −
+                                  </button>
+                                  <span className="min-w-[20px] text-center text-sm font-semibold text-white">
+                                    {item.qty}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateQty(item.id, +1)}
+                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-white/5 text-base font-semibold text-violet-100 active:scale-95"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-2">
+                                <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white">
+                                  {formatPrice(item.price * item.qty)}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeFromCart(item.id)}
+                                  className="text-[11px] text-violet-200/55 underline-offset-2 hover:underline"
+                                >
+                                  убрать
+                                </button>
+                              </div>
+                            </div>
+                          </SectionCard>
+                        ))}
+                      </div>
+
+                      {/* Итого + кнопка оплаты */}
+                      <SectionCard className="bg-[linear-gradient(135deg,rgba(168,85,247,0.18),rgba(99,102,241,0.12))]">
+                        <div className="flex items-center justify-between text-sm text-violet-100/60">
+                          <span>Позиций</span>
+                          <span className="text-white">{cartCount}</span>
+                        </div>
+                        <div className="mt-3 flex items-center justify-between text-sm text-violet-100/60">
+                          <span>На балансе</span>
+                          <span className="text-white">{formatPrice(balance)}</span>
+                        </div>
+                        <div className="mt-4 h-px bg-white/10" />
+                        <div className="mt-4 flex items-center justify-between text-2xl font-bold text-white">
+                          <span>Итого</span>
+                          <span>{formatPrice(cartTotal)}</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleCheckout}
+                          className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500 px-5 py-4 text-base font-semibold text-white shadow-[0_14px_40px_rgba(168,85,247,0.4)] active:scale-[0.99]"
+                        >
+                          <span className="text-lg">✦</span>
+                          Перейти к оплате · {formatPrice(cartTotal)}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            vibrate("light");
+                            setCart([]);
+                            setNotice("Корзина очищена.");
+                          }}
+                          className="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-violet-100/80"
+                        >
+                          Очистить корзину
+                        </button>
+                      </SectionCard>
+                    </>
+                  )}
+
+                  {/* История заказов */}
+                  {orders.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-3 px-1 pt-2">
+                        <h3 className="text-lg font-semibold text-white">История заказов</h3>
+                        <div className="h-px flex-1 bg-white/10" />
+                        <span className="text-xs text-violet-100/45">{orders.length}</span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {orders.map((item) => (
+                          <SectionCard key={item.id} className="p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <div className="text-base font-semibold text-white">
+                                  {item.title}
+                                </div>
+                                <div className="mt-1 text-xs text-violet-100/55">
                                   {item.tariffTitle} • {item.category}
                                 </div>
                               </div>
@@ -754,27 +945,17 @@ export default function App() {
                         ))}
                       </div>
 
-                      <SectionCard>
-                        <div className="flex items-center justify-between text-sm text-violet-100/60">
-                          <span>Оформлено товаров</span>
-                          <span>{cart.length}</span>
-                        </div>
-                        <div className="mt-3 flex items-center justify-between text-xl font-semibold text-white">
-                          <span>Сумма</span>
-                          <span>{formatPrice(totalOrdersPrice)}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            vibrate("light");
-                            setCart([]);
-                            setNotice("История заказов очищена.");
-                          }}
-                          className="mt-5 w-full rounded-[22px] border border-white/10 bg-white/5 px-5 py-4 text-sm font-semibold text-violet-100"
-                        >
-                          Очистить историю
-                        </button>
-                      </SectionCard>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          vibrate("light");
+                          setOrders([]);
+                          setNotice("История очищена.");
+                        }}
+                        className="w-full rounded-[22px] border border-white/10 bg-white/[0.03] px-5 py-3 text-xs font-medium text-violet-100/55"
+                      >
+                        Очистить историю
+                      </button>
                     </>
                   )}
                 </div>
@@ -821,7 +1002,6 @@ export default function App() {
                                 : "border-white/10 bg-white/[0.04]"
                             }`}
                           >
-                            {/* Логотип — без контейнера, увеличенный, без обрезки */}
                             <div className="flex h-16 w-16 items-center justify-start">
                               {method.logo ? (
                                 <img
@@ -992,9 +1172,9 @@ export default function App() {
                         className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-left transition active:scale-95"
                       >
                         <div className="text-[11px] uppercase tracking-[0.28em] text-violet-100/45">
-                          Заказов
+                          В корзине
                         </div>
-                        <div className="mt-2 text-xl font-semibold text-white">{cart.length}</div>
+                        <div className="mt-2 text-xl font-semibold text-white">{cartCount}</div>
                       </button>
                     </div>
                   </SectionCard>
@@ -1007,7 +1187,7 @@ export default function App() {
                         "Telegram ready",
                         "Категории-фильтры",
                         "Страница товара",
-                        "Бейджи платформ",
+                        "Корзина и оплата",
                       ].map((chip) => (
                         <span
                           key={chip}
@@ -1028,6 +1208,7 @@ export default function App() {
           <div className="grid grid-cols-4 gap-1">
             {navItems.map((item) => {
               const isActive = item.id === activeTab && !openedProduct;
+              const showBadge = item.id === "orders" && cartCount > 0;
               return (
                 <button
                   key={item.id}
@@ -1037,7 +1218,7 @@ export default function App() {
                     setOpenedProductId(null);
                     setActiveTab(item.id);
                   }}
-                  className={`flex flex-col items-center justify-center rounded-[18px] px-2 py-2 text-center transition-all duration-200 ${
+                  className={`relative flex flex-col items-center justify-center rounded-[18px] px-2 py-2 text-center transition-all duration-200 ${
                     isActive
                       ? "bg-gradient-to-b from-violet-500/35 to-indigo-500/15 text-white"
                       : "text-violet-100/60"
@@ -1045,6 +1226,11 @@ export default function App() {
                 >
                   <span className="text-lg">{item.icon}</span>
                   <span className="mt-1 text-[11px] font-medium">{item.label}</span>
+                  {showBadge && (
+                    <span className="absolute right-3 top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-fuchsia-500 px-1 text-[10px] font-bold text-white shadow-[0_0_12px_rgba(232,121,249,0.7)]">
+                      {cartCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1067,7 +1253,7 @@ export default function App() {
                 Недостаточно средств
               </h3>
               <p className="mt-2 text-center text-sm text-violet-100/65">
-                Для покупки <span className="text-white">{noFundsModal.title}</span> не хватает{" "}
+                Для оплаты <span className="text-white">{noFundsModal.title}</span> не хватает{" "}
                 <span className="font-semibold text-violet-200">
                   {formatPrice(noFundsModal.needed)}
                 </span>
@@ -1100,4 +1286,3 @@ export default function App() {
       </div>
     </div>
   );
-}
