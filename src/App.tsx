@@ -536,7 +536,8 @@ export default function App() {
                     {openedProduct.description}
                   </p>
 
-                  <div className="mt-5 flex flex-wrap gap-2">import { useEffect, useMemo, useState, type ReactNode } from "react";
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 type TabId = "catalog" | "orders" | "balance" | "profile";
 type DurationId = "trial" | "month" | "lifetime";
