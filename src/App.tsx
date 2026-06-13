@@ -167,7 +167,7 @@ const products: Product[] = [
     short: "Личный сертификат подписи",
     description:
       "Персональный сертификат для подписи iOS-приложений. Стабильная работа, быстрая выдача после оплаты.",
-    image: "",
+    image: "https://i.ibb.co/Y4r3Lrm0/IMG-1160.png",
     platform: "iOS",
     features: ["Личный", "Быстрая выдача", "Стабильность", "Поддержка"],
     tariffs: [
@@ -182,7 +182,7 @@ const products: Product[] = [
     short: "Корпоративная подпись",
     description:
       "Корпоративный сертификат iOS для масштабного распространения приложений. Подходит для команд и студий.",
-    image: "",
+    image: "https://i.ibb.co/Kpd1RNr4/IMG-1159.png",
     platform: "iOS",
     features: ["Enterprise", "Без лимитов", "Поддержка 24/7", "Гарантия"],
     tariffs: [
