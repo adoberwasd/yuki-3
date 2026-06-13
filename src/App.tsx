@@ -87,7 +87,7 @@ const products: Product[] = [
     short: "Приватный софт для Standoff 2",
     description:
       "Фирменный YUKI iPA под Standoff 2: стабильная сборка, аккуратная работа и регулярные обновления под актуальные версии игры.",
-    image: "",
+    image: "https://i.ibb.co/ymzPtBhj/IMG-1143.jpg",
     platform: "iOS",
     features: ["iPA сборка", "Стабильно", "Обновления", "Поддержка"],
     tariffs: [
