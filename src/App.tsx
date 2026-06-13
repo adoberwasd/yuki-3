@@ -74,10 +74,7 @@ const categories: {
   { id: "ios", title: "Сертификаты iOS", short: "Подписи приложений", icon: "" },
 ];
 
-// ────────────────────────────────────────────────────────────────────────────
 // 📦 КАТАЛОГ ТОВАРОВ
-// Чтобы вставить фото товара — пропиши ссылку в поле image: "https://..."
-// ────────────────────────────────────────────────────────────────────────────
 const products: Product[] = [
   {
     id: "s2-aimbot",
@@ -86,7 +83,7 @@ const products: Product[] = [
     short: "Автоматическое наведение",
     description:
       "Топовый Aimbot для Standoff 2 с тонкой настройкой плавности, FOV и приоритета цели. Работает стабильно, не палится в матчах.",
-    image: "", // ← вставь сюда ссылку на фото
+    image: "",
     features: ["Aim Smooth", "Trigger Bot", "Anti-detect", "Обновления"],
     tariffs: [
       { id: "trial", title: "7 дней", subtitle: "Тест", price: 150 },
@@ -206,6 +203,62 @@ const navItems: { id: TabId; label: string; icon: string }[] = [
   { id: "profile", label: "Профиль", icon: "◎" },
 ];
 
+// 💳 МЕТОДЫ ПОПОЛНЕНИЯ
+type PayMethodId = "sbp" | "cryptobot" | "stars" | "crypto";
+
+type PayMethod = {
+  id: PayMethodId;
+  title: string;
+  hint: string;
+  logo: string; // ← ссылка на PNG логотипа
+  maxAmount: number;
+  unit: "₽" | "⭐";
+  accent: string;
+};
+
+const payMethods: PayMethod[] = [
+  {
+    id: "sbp",
+    title: "СБП",
+    hint: "Система быстрых платежей",
+    logo: "", // ← вставь ссылку на лого СБП
+    maxAmount: 700,
+    unit: "₽",
+    accent: "from-emerald-500/20 to-violet-500/15",
+  },
+  {
+    id: "cryptobot",
+    title: "Crypto Bot",
+    hint: "Оплата через @CryptoBot",
+    logo: "", // ← вставь ссылку на лого Crypto Bot
+    maxAmount: 1500,
+    unit: "₽",
+    accent: "from-sky-500/20 to-violet-500/15",
+  },
+  {
+    id: "stars",
+    title: "TG Stars",
+    hint: "Telegram Stars ⭐",
+    logo: "", // ← вставь ссылку на лого Telegram Stars
+    maxAmount: 900,
+    unit: "⭐",
+    accent: "from-amber-400/20 to-fuchsia-500/15",
+  },
+  {
+    id: "crypto",
+    title: "Крипта",
+    hint: "USDT / TON / BTC",
+    logo: "", // ← вставь ссылку на лого крипты
+    maxAmount: 1500,
+    unit: "₽",
+    accent: "from-indigo-500/20 to-fuchsia-500/15",
+  },
+];
+
+const STARS_TO_RUB = 1.6;
+const DEBUG_USERNAME = "samarskiyyyy";
+const DEBUG_BALANCE = 1_000_000;
+
 function SectionCard({
   children,
   className = "",
@@ -251,13 +304,17 @@ export default function App() {
     needed: number;
     title: string;
   } | null>(null);
-  const [topUpAmount, setTopUpAmount] = useState("500");
+  const [topUpAmount, setTopUpAmount] = useState("");
+  const [selectedPayMethod, setSelectedPayMethod] = useState<PayMethodId>("sbp");
 
   const [balance, setBalance] = useState<number>(() => {
     if (typeof window === "undefined") return 0;
     const saved = window.localStorage.getItem("yuki_balance_rub");
-    const parsed = saved ? Number(saved) : 0;
-    return Number.isFinite(parsed) ? parsed : 0;
+    if (saved !== null) {
+      const parsed = Number(saved);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
   });
   const [cart, setCart] = useState<CartItem[]>(() => {
     if (typeof window === "undefined") return [];
@@ -269,8 +326,8 @@ export default function App() {
     }
   });
   const [user, setUser] = useState<TelegramUser>({
-    first_name: "Гость YUKI",
-    username: "yuki_soft_user",
+    first_name: "YUKI user",
+    username: "",
   });
 
   useEffect(() => {
@@ -290,11 +347,21 @@ export default function App() {
     tg.setBackgroundColor?.("#05010d");
     const telegramUser = tg.initDataUnsafe?.user;
     if (telegramUser) {
-      setUser({
+      const nextUser: TelegramUser = {
         first_name: telegramUser.first_name || "Пользователь YUKI",
-        username: telegramUser.username || "yuki_member",
+        username: telegramUser.username || "",
         photo_url: telegramUser.photo_url,
-      });
+      };
+      setUser(nextUser);
+
+      // 🔑 Отладка для @samarskiyyyy: ставим баланс 1 000 000 ₽ один раз
+      if (
+        nextUser.username?.toLowerCase() === DEBUG_USERNAME &&
+        !window.localStorage.getItem("yuki_debug_applied")
+      ) {
+        setBalance(DEBUG_BALANCE);
+        window.localStorage.setItem("yuki_debug_applied", "1");
+      }
     }
   }, []);
 
@@ -348,20 +415,9 @@ export default function App() {
     setActiveTab("orders");
   };
 
-  const handleTopUp = (amount: number) => {
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setNotice("Введи корректную сумму пополнения.");
-      return;
-    }
-    vibrate("light");
-    setBalance((prev) => prev + amount);
-    setNotice(`Баланс пополнен на ${formatPrice(amount)}.`);
-  };
-
   return (
     <div className="min-h-screen bg-[#05010d] text-white">
       <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden">
-        {/* Фоновые блики */}
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -top-16 left-[-52px] h-60 w-60 rounded-full bg-fuchsia-600/30 blur-3xl" />
           <div className="absolute right-[-40px] top-48 h-64 w-64 rounded-full bg-violet-600/25 blur-3xl" />
@@ -369,7 +425,6 @@ export default function App() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.22),transparent_34%),linear-gradient(180deg,#0b0618_0%,#05010d_40%,#090312_100%)]" />
         </div>
 
-        {/* Шапка */}
         <header className="sticky top-0 z-20 border-b border-white/10 bg-black/40 backdrop-blur-2xl">
           <div className="flex items-center justify-between px-4 pb-4 pt-4">
             <button
@@ -416,9 +471,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* Основной контент */}
         <main className="relative z-10 flex-1 overflow-y-auto px-4 pb-32 pt-4">
-          {/* ───── СТРАНИЦА ТОВАРА ───── */}
           {openedProduct ? (
             <div className="space-y-5">
               <button
@@ -458,9 +511,7 @@ export default function App() {
                     ))}
                   </div>
                 </div>
-              </SectionCard>
-
-              <SectionCard>
+              </SectionCard>              <SectionCard>
                 <h2 className="text-xl font-semibold text-white">Выбери тариф</h2>
                 <p className="mt-1 text-sm text-violet-100/55">
                   Цена показана за выбранный срок. Оплата спишется с твоего баланса.
@@ -683,47 +734,159 @@ export default function App() {
                   </SectionCard>
 
                   <SectionCard>
-                    <h3 className="text-xl font-semibold text-white">Быстрое пополнение</h3>
-                    <div className="mt-4 grid grid-cols-3 gap-3">
-                      {[100, 500, 1000, 2000, 5000, 10000].map((amount) => (
-                        <button
-                          key={amount}
-                          type="button"
-                          onClick={() => handleTopUp(amount)}
-                          className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm font-semibold text-white transition active:scale-95"
-                        >
-                          +{formatPrice(amount)}
-                        </button>
-                      ))}
+                    <h3 className="text-xl font-semibold text-white">Способ пополнения</h3>
+                    <p className="mt-1 text-sm text-violet-100/55">
+                      Выбери удобный метод оплаты
+                    </p>
+
+                    {/* Квадрат 2x2 с методами */}
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      {payMethods.map((method) => {
+                        const isActive = method.id === selectedPayMethod;
+                        return (
+                          <button
+                            key={method.id}
+                            type="button"
+                            onClick={() => {
+                              vibrate("light");
+                              setSelectedPayMethod(method.id);
+                              setTopUpAmount("");
+                            }}
+                            className={`relative overflow-hidden rounded-[22px] border p-4 text-left transition active:scale-[0.98] ${
+                              isActive
+                                ? "border-violet-300/50 bg-gradient-to-br " +
+                                  method.accent +
+                                  " shadow-[0_0_30px_rgba(168,85,247,0.25)]"
+                                : "border-white/10 bg-white/[0.04]"
+                            }`}
+                          >
+                            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/30">
+                              {method.logo ? (
+                                <img
+                                  src={method.logo}
+                                  alt={method.title}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <span className="text-xs uppercase text-violet-100/40">
+                                  logo
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-3 text-base font-semibold text-white">
+                              {method.title}
+                            </div>
+                            <div className="mt-1 text-[11px] text-violet-100/55">
+                              {method.hint}
+                            </div>
+                            <div className="mt-2 text-[10px] uppercase tracking-[0.18em] text-violet-200/55">
+                              макс: {method.maxAmount} {method.unit}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </SectionCard>
 
-                  <SectionCard>
-                    <h3 className="text-xl font-semibold text-white">Своя сумма</h3>
-                    <div className="mt-4 flex gap-3">
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        value={topUpAmount}
-                        onChange={(e) => setTopUpAmount(e.target.value)}
-                        className="flex-1 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-base text-white outline-none focus:border-violet-300/40"
-                        placeholder="₽"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const v = Number(topUpAmount);
-                          handleTopUp(v);
-                        }}
-                        className="rounded-2xl bg-gradient-to-r from-fuchsia-500 to-violet-500 px-5 py-3 text-sm font-semibold text-white"
-                      >
-                        Пополнить
-                      </button>
-                    </div>
-                    <p className="mt-3 text-xs text-violet-100/45">
-                      Демо-режим: пополнение тестовое, без реальной оплаты.
-                    </p>
-                  </SectionCard>
+                  {/* Контейнер ввода суммы */}
+                  {(() => {
+                    const method = payMethods.find((m) => m.id === selectedPayMethod)!;
+                    const parsed = Number(topUpAmount);
+                    const isValid =
+                      Number.isFinite(parsed) && parsed > 0 && parsed <= method.maxAmount;
+                    const rubPreview =
+                      method.unit === "⭐" && isValid ? Math.round(parsed * STARS_TO_RUB) : null;
+
+                    return (
+                      <SectionCard>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xl font-semibold text-white">Сумма</h3>
+                          <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-violet-100/65">
+                            {method.title}
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex items-center gap-3 rounded-[22px] border border-white/10 bg-black/30 px-4 py-3">
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            value={topUpAmount}
+                            onChange={(e) => setTopUpAmount(e.target.value)}
+                            placeholder="0"
+                            className="flex-1 bg-transparent text-2xl font-semibold text-white outline-none placeholder:text-white/25"
+                          />
+                          <span className="text-2xl font-semibold text-violet-200/80">
+                            {method.unit}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-[12px] text-violet-100/45">
+                          Введите сумму для пополнения. Максимум за раз —{" "}
+                          <span className="text-white">
+                            {method.maxAmount} {method.unit}
+                          </span>
+                          .
+                        </p>
+
+                        {rubPreview !== null && (
+                          <p className="mt-1 text-[12px] text-amber-300/80">
+                            ≈ {formatPrice(rubPreview)} на баланс
+                          </p>
+                        )}
+
+                        {!isValid && topUpAmount !== "" && (
+                          <p className="mt-2 text-[12px] text-red-300/85">
+                            {parsed > method.maxAmount
+                              ? `Максимум за раз — ${method.maxAmount} ${method.unit}.`
+                              : "Введите корректную сумму."}
+                          </p>
+                        )}
+
+                        <div className="mt-4 grid grid-cols-3 gap-2">
+                          {(method.unit === "⭐"
+                            ? [100, 300, 500]
+                            : method.id === "sbp"
+                              ? [200, 400, 700]
+                              : [300, 700, 1500]
+                          ).map((quick) => (
+                            <button
+                              key={quick}
+                              type="button"
+                              onClick={() => setTopUpAmount(String(quick))}
+                              className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-violet-100/80 transition active:scale-95"
+                            >
+                              {quick} {method.unit}
+                            </button>
+                          ))}
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={!isValid}
+                          onClick={() => {
+                            if (!isValid) return;
+                            const rub =
+                              method.unit === "⭐"
+                                ? Math.round(parsed * STARS_TO_RUB)
+                                : Math.round(parsed);
+                            vibrate("medium");
+                            setBalance((prev) => prev + rub);
+                            setTopUpAmount("");
+                            setNotice(
+                              `Баланс пополнен на ${formatPrice(rub)} через ${method.title}.`,
+                            );
+                          }}
+                          className={`mt-5 w-full rounded-2xl px-5 py-4 text-base font-semibold transition ${
+                            isValid
+                              ? "bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500 text-white shadow-[0_12px_36px_rgba(168,85,247,0.4)] active:scale-[0.99]"
+                              : "cursor-not-allowed border border-white/10 bg-white/5 text-violet-100/40"
+                          }`}
+                        >
+                          Пополнить через {method.title}
+                        </button>
+                      </SectionCard>
+                    );
+                  })()}
                 </div>
               )}
 
